@@ -8,6 +8,10 @@
 
 @import <Foundation/CPObject.j>
 
+requestURL = @"php/getJSON.php";
+addColumnsNot = @"AddColumnsNotification";
+reloadTableNot = @"ReloadTableNotification";
+
 @implementation CPWebViewFix : CPWebView
 - (void)_loadMainFrameURL
 {
@@ -43,7 +47,7 @@
 }
 - (void)getTrades
 {
-	var request = [CPURLRequest requestWithURL:"php/getJSONTrades.php"];
+	var request = [CPURLRequest requestWithURL:requestURL];
 	[[CPURLConnection alloc] initWithRequest:request delegate:self];
 }
 - (void)connection:(CPURLConnection)aConnection didReceiveData:(CPString)data
@@ -59,7 +63,7 @@
 		columnHeaders = [trades[0] allKeys];
 	
 	[[CPNotificationCenter defaultCenter]
-        postNotificationName:@"AddColumnsNotification" object:nil];
+        postNotificationName:addColumnsNot object:nil];
 }
 - (void)connection:(CPURLConnection)aConnection didFailWithError:(CPString)error
 {
@@ -104,7 +108,7 @@
 			count++;
 		}
 	[[CPNotificationCenter defaultCenter]
-        postNotificationName:@"ReloadTableNotification" object:nil];
+        postNotificationName:reloadTableNot object:nil];
 }
 @end
 
@@ -126,13 +130,13 @@
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
                selector:@selector(reloadTable:)
-                   name:@"ReloadTableNotification" 
+                   name:reloadTableNot
                  object:nil];
 				 
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
                selector:@selector(addColumns:)
-                   name:@"AddColumnsNotification" 
+                   name:addColumnsNot 
                  object:nil];
 
 	tradeDS = [[TradeDataSource alloc] init];
@@ -189,9 +193,6 @@
 	[tableView setDelegate:self];
 	[tableView setTarget:self];
     [tableView setDoubleAction:@selector(openIssueInNewWindow:)];
-	
-	// combine scroll/table views
-    [scrollView setDocumentView:tableView]; 
 
 	//create webview
 	webView = [[CPWebViewFix alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([horizontalSplitter bounds])-16, CGRectGetHeight([horizontalSplitter bounds])-300)];
@@ -220,20 +221,13 @@
 }
 - (void)openIssueInNewWindow:(id)sender
 {
-	[webView setMainFrameURL:@"/tacticalTrades.php"];
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
+	[webView setMainFrameURL:@"/tacticalTrades.php"];
 }
 - (void)addColumns:(CPNotification)aNotification
 {
-	console.log('testing');
-	console.log([tradeDS columnHeaders]);
-
-	//[tableView reloadData]; 
-}
-- (void)reloadTable:(CPNotification)aNotification
-{	
 	for(var i=0;i < [[tradeDS columnHeaders] count];i++){
 		var headerKey = [[tradeDS columnHeaders] objectAtIndex:i];
 		var desc = [CPSortDescriptor sortDescriptorWithKey:headerKey ascending:NO];
@@ -245,6 +239,12 @@
 		[[column headerView] setBackgroundColor:headerColor];
 		[tableView addTableColumn:column];
 	}
+
+    [scrollView setDocumentView:tableView]; 
+	[tableView reloadData]; 
+}
+- (void)reloadTable:(CPNotification)aNotification
+{	
     [tableView reloadData];  
 }
 @end

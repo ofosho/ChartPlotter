@@ -1,19 +1,20 @@
 /*
  * AppController.j
- * testapp
+ * ChartPlotter
  *
- * Created by You on November 10, 2010.
- * Copyright 2010, Your Company All rights reserved.
+ * Created by ofosho on November 10, 2010.
+ * Copyright 2010, OTech Engineering Inc All rights reserved.
  */
 
 @import <Foundation/CPObject.j>
 @import <AppKit/CPView.j>
 @import "FilterBar.j"
 @import "ListDataSource.j"
+@import "GroupDataSource.j"
 @import "globals.j"
 
-
 //CPWebView changes style on _loadMainFrameURL
+//this override removes that line
 @implementation CPWebViewFix : CPWebView
 - (void)_loadMainFrameURL
 {
@@ -34,10 +35,16 @@
 	CPSplitView verticalSplitter;
 	CPSplitView horizontalSplitter;
 	CPView scrollParentView;
+	CPView leftView;
+	CPView rightView;
+	CPSearchField searchField;
 	CPWebViewFix webView;
 	CPTableView tableView;
+	CPTableView groupView;
 	CPScrollView scrollView;
+	CPScrollView groupScrollView;
 	ListDataSource listDS;
+	GroupDataSource groupDS;
 	JSObject headerColor;
 	FilterBar   filterBar;
 }
@@ -46,7 +53,29 @@
 {
 	var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
 		contentView = [theWindow contentView];
-		
+
+	listDS = [[ListDataSource alloc] init];
+	groupDS = [[GroupDataSource alloc] init];
+	headerColor = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[[CPBundle mainBundle] pathForResource:@"button-bezel-center.png"]]]; 
+
+	[self initNotifications];	
+	[self createFilterBar];
+	[self createSearchField];
+	[self splitPage:[contentView bounds]];
+	[self createGroupView];
+	[self createListView];
+	[self createWebView];
+
+	[self combineViews];
+	
+	// add vertical splitter (entire page) to contentview
+	[contentView addSubview:verticalSplitter];
+
+	[theWindow orderFront:self];
+	[CPMenu setMenuBarVisible:YES];
+}
+- (void)initNotifications
+{
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
                selector:@selector(reloadTable:)
@@ -63,93 +92,7 @@
             addObserver:self
                selector:@selector(hideFilterBar:)
                    name:hideFilterBarNoti
-                 object:nil];				 
-
-	listDS = [[ListDataSource alloc] init];
-	headerColor = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[[CPBundle mainBundle] pathForResource:@"button-bezel-center.png"]]]; 
-
-	filterBar = [[FilterBar alloc] initWithFrame:CGRectMake(0, 0, 400, 32)];
-    [filterBar setAutoresizingMask:CPViewWidthSizable];
-    [filterBar setDelegate:listDS];
-	
-    // create the search field
-    var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(0, 10, 200, 30)];
-	[searchField setEditable:YES];
-	[searchField setPlaceholderString:@"search and hit enter"];
-	[searchField setBordered:YES];
-	[searchField setBezeled:YES];
-	[searchField setFont:[CPFont systemFontOfSize:12.0]];
-	[searchField setTarget:listDS];
-	[searchField setAction:@selector(searchChanged:)];
-	[searchField setSendsWholeSearchString:NO]; 
-
-	// create the buttons
-	var button1 = [[CPButton alloc] initWithFrame:CGRectMake(10, 40, 100, 18)];
-	[button1 setTitle:@"button1"];
-	[button1 sizeToFit];
-	var button2 = [[CPButton alloc] initWithFrame:CGRectMake(10, 70, 100, 18)];
-	[button2 setTitle:@"button2"];
-	[button2 sizeToFit];
-  
-	// create a view to split the page by left/right
-	// this view will actually hold the entire page
-    verticalSplitter = [[CPSplitView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([contentView bounds]), CGRectGetHeight([contentView bounds]))];
-	[verticalSplitter setDelegate:self];
-	[verticalSplitter setVertical:YES]; 
-	[verticalSplitter setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ]; 
-	// create the left view
-	var leftView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, 200, CGRectGetHeight([verticalSplitter bounds]))];
-	// create the right view
-	var rightView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([verticalSplitter bounds]) - 200, CGRectGetHeight([verticalSplitter bounds]))];
-	[rightView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ];
-	// 1 pixel size for the splitter
-	[verticalSplitter setIsPaneSplitter:YES];	
-
-	// create a view to split the right view into top/bottom
-	horizontalSplitter = [[CPSplitView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([rightView bounds]), CGRectGetHeight([rightView bounds]))];
-	[horizontalSplitter setDelegate:self];
-	[horizontalSplitter setVertical:NO]; 
-	[horizontalSplitter setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ]; 
-
-	scrollParentView = [[CPView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
-    // create a CPScrollView that will contain the CPTableView
-    scrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
-    [scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable]; 
-    // create the CPTableView
-    tableView = [[CPTableView alloc] initWithFrame:[scrollView bounds]];
-    [tableView setDataSource:listDS];
-    [tableView setUsesAlternatingRowBackgroundColors:YES];
-    [[tableView cornerView] setBackgroundColor:headerColor];
-	[tableView setAllowsMultipleSelection:YES];
-	[tableView setDelegate:self];
-	[tableView setTarget:self];
-    [tableView setDoubleAction:@selector(openIssueInNewWindow:)];
-
-	//create webview
-	webView = [[CPWebViewFix alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([horizontalSplitter bounds])-16, CGRectGetHeight([horizontalSplitter bounds])-300)];
-	//[webView setAutoresizingMask: CPViewWidthSizable | CPViewHeightSizable];
-	[webView setAutoresizingMask: CPViewWidthSizable | CPViewMinYMargin | CPViewMaxYMargin];
-	[webView setScrollMode:CPWebViewScrollAppKit]; 
-
-	//combine views
-	// add buttons/search bar to leftview
-	[leftView addSubview:button1];
-	[leftView addSubview:button2];
-    [leftView addSubview:searchField];
-	// add scrollView/webView to right side of page
-	[scrollParentView addSubview:scrollView];
-	[horizontalSplitter addSubview:scrollParentView];
-	[horizontalSplitter addSubview:webView];
-	// add horizontal view into right view in order to split it in half
-	[rightView addSubview:horizontalSplitter];
-	// add the left/right view to the veritcalview
-	[verticalSplitter addSubview:leftView];
-	[verticalSplitter addSubview:rightView];
-	// add vertical splitter (entire page) to contentview
-	[contentView addSubview:verticalSplitter];
-
-	[theWindow orderFront:self];
-	[CPMenu setMenuBarVisible:YES];
+                 object:nil];
 }
 - (void)openIssueInNewWindow:(id)sender
 {
@@ -157,6 +100,38 @@
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
 	//[webView setMainFrameURL:@"/tacticalLists.php"];
+}
+- (void)reloadTable:(CPNotification)aNotification
+{	
+	[self showFilterBar];
+    [tableView reloadData];	
+}
+- (void)hideFilterBar:(CPNotification)aNotification
+{
+    if (![filterBar superview])
+        return;
+
+    [filterBar removeFromSuperview];
+
+    var frame = [scrollView frame];
+    frame.origin.y = 0;
+    frame.size.height += 32;
+	
+    [scrollView setFrame:frame];
+}
+- (void)showFilterBar
+{
+    if ([filterBar superview])
+        return;
+
+    [filterBar setFrame:CGRectMake(0, 0, CGRectGetWidth([scrollParentView frame]), 32)];
+    [scrollParentView addSubview:filterBar];
+
+    var frame = [scrollView frame];
+    frame.origin.y = 32;
+    frame.size.height -= 32;
+	
+    [scrollView setFrame:frame];
 }
 - (void)addColumns:(CPNotification)aNotification
 {
@@ -175,36 +150,106 @@
     [scrollView setDocumentView:tableView]; 
 	[tableView reloadData]; 
 }
-- (void)reloadTable:(CPNotification)aNotification
-{	
-	[self showFilterBar];
-    [tableView reloadData];	
-}
-- (void)showFilterBar
+- (void)createGroupView
 {
-    if ([filterBar superview])
-        return;
+	groupScrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 50, CGRectGetWidth([leftView bounds]), CGRectGetHeight([leftView bounds]))];
+	[groupScrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+	[groupScrollView setAutohidesScrollers:YES];
 
-    [filterBar setFrame:CGRectMake(0, 0, CGRectGetWidth([scrollParentView frame]), 32)];
-    [scrollParentView addSubview:filterBar];
+	groupView = [[CPTableView alloc] initWithFrame:[groupScrollView bounds]];
+	[groupView setIntercellSpacing:CGSizeMakeZero()];
+    [groupView setHeaderView:nil];
+    [groupView setCornerView:nil];
+	[groupView setDataSource:groupDS];
 
-    var frame = [scrollView frame];
-
-    frame.origin.y = 32;
-    frame.size.height -= 32;
-    [scrollView setFrame:frame];
+    var column = [[CPTableColumn alloc] initWithIdentifier:groupColId];
+    [column setWidth:220.0];
+    [column setMinWidth:50.0];
+    
+    [groupView addTableColumn:column];
+    [groupView setColumnAutoresizingStyle:CPTableViewLastColumnOnlyAutoresizingStyle];
+    [groupView setRowHeight:26.0];
+    [groupView setSelectionHighlightStyle:CPTableViewSelectionHighlightStyleSourceList];
+	
+	[groupScrollView setDocumentView:groupView];
 }
-- (void)hideFilterBar:(CPNotification)aNotification
+- (void)createListView
 {
-    if (![filterBar superview])
-        return;
+	//create view to hold scrollView and filterBar
+	scrollParentView = [[CPView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
+    // create a CPScrollView that will contain the CPTableView
+    scrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
+    [scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable]; 
+    // create the CPTableView
+    tableView = [[CPTableView alloc] initWithFrame:[scrollView bounds]];
+    [tableView setDataSource:listDS];
+    [tableView setUsesAlternatingRowBackgroundColors:YES];
+    [[tableView cornerView] setBackgroundColor:headerColor];
+	[tableView setAllowsMultipleSelection:YES];
+	[tableView setDelegate:self];
+	[tableView setTarget:self];
+    [tableView setDoubleAction:@selector(openIssueInNewWindow:)];
+}
+- (void)createWebView
+{
+	webView = [[CPWebViewFix alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([horizontalSplitter bounds])-16, CGRectGetHeight([horizontalSplitter bounds])-300)];
+	[webView setAutoresizingMask: CPViewWidthSizable | CPViewMinYMargin | CPViewMaxYMargin];
+	[webView setScrollMode:CPWebViewScrollAppKit]; 
+}
+- (void)createSearchField
+{
+    searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(0, 10, 200, 30)];
+	[searchField setEditable:YES];
+	[searchField setPlaceholderString:@"search and hit enter"];
+	[searchField setBordered:YES];
+	[searchField setBezeled:YES];
+	[searchField setFont:[CPFont systemFontOfSize:12.0]];
+	[searchField setTarget:listDS];
+	[searchField setAction:@selector(searchChanged:)];
+	[searchField setSendsWholeSearchString:NO]; 
+}
+- (void)createFilterBar
+{
+	filterBar = [[FilterBar alloc] initWithFrame:CGRectMake(0, 0, 400, 32)];
+    [filterBar setAutoresizingMask:CPViewWidthSizable];
+    [filterBar setDelegate:listDS];
+}
+- (void)splitPage:(CGRect)aBounds
+{
+	// create a view to split the page by left/right
+	verticalSplitter = [[CPSplitView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(aBounds), CGRectGetHeight(aBounds))];
+	[verticalSplitter setDelegate:self];
+	[verticalSplitter setVertical:YES]; 
+	[verticalSplitter setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ];
+	[verticalSplitter setIsPaneSplitter:YES]; //1px splitter line	
 
-    [filterBar removeFromSuperview];
+	//create left/right views
+	leftView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, 200, CGRectGetHeight([verticalSplitter bounds]))];
+	rightView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([verticalSplitter bounds]) - 200, CGRectGetHeight([verticalSplitter bounds]))];
+	[rightView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ];
 
-    var frame = [scrollView frame];
-
-    frame.origin.y = 0;
-    frame.size.height += 32;
-    [scrollView setFrame:frame];
+	// create a view to split the right view into top/bottom
+	horizontalSplitter = [[CPSplitView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([rightView bounds]), CGRectGetHeight([rightView bounds]))];
+	[horizontalSplitter setDelegate:self];
+	[horizontalSplitter setVertical:NO]; 
+	[horizontalSplitter setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ]; 
+}
+- (void)combineViews
+{
+	// add search bar/groups to leftview
+    [leftView addSubview:searchField];
+	[leftView addSubview:groupScrollView];
+	
+	// add scrollView/webView to right side of page
+	[scrollParentView addSubview:scrollView];
+	[horizontalSplitter addSubview:scrollParentView];
+	[horizontalSplitter addSubview:webView];
+	
+	// add horizontal view into right view in order to split top/bottom
+	[rightView addSubview:horizontalSplitter];
+	
+	// add the left/right view to the veritcalview
+	[verticalSplitter addSubview:leftView];
+	[verticalSplitter addSubview:rightView];
 }
 @end

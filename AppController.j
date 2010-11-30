@@ -7,12 +7,13 @@
  */
 
 @import <Foundation/CPObject.j>
+@import <AppKit/CPView.j>
+@import "FilterBar.j"
+@import "ListDataSource.j"
+@import "globals.j"
 
-requestURL = @"php/getJSON.php";
-addColumnsNoti = @"AddColumnsNotification";
-reloadTableNoti = @"ReloadTableNotification";
-hideFilterBarNoti = @"HideFilterBarNotification";
 
+//CPWebView changes style on _loadMainFrameURL
 @implementation CPWebViewFix : CPWebView
 - (void)_loadMainFrameURL
 {
@@ -28,205 +29,6 @@ hideFilterBarNoti = @"HideFilterBarNotification";
 }
 @end
 
-
-@import <AppKit/CPView.j>
-
-FilterAll = 0;
-FilterTitle = 1;
-FilterBody = 2;
-FilterLabels = 3;
-FilterCreator = 4;
-
-@implementation FilterBar : CPView
-{
-    id delegate @accessors;
-    CPRadioGroup radioGroup;
-}
-
-- (id)initWithFrame:(CGRect)aFrame
-{
-    if (self = [super initWithFrame:aFrame])
-    {
-        var bundle = [CPBundle mainBundle],
-            headerImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:"filterBarBackground.png"] size:CGSizeMake(1, 32)],
-            leftCapImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"MediaFilterLeftCap.png"] size:CGSizeMake(9, 19)],
-            rightCapImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"MediaFilterRightCap.png"] size:CGSizeMake(9, 19)],
-            centerImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"MediaFilterCenter.png"] size:CGSizeMake(1, 19)],
-            bezelImage = [[CPThreePartImage alloc] initWithImageSlices:[leftCapImage, centerImage, rightCapImage] isVertical:NO],
-            radioImageReplace = [[CPImage alloc] init];
-
-        [self setBackgroundColor:[CPColor colorWithPatternImage:headerImage]];
-
-        var allRadio = [CPRadio radioWithTitle:@"All"],
-            titleRadio = [CPRadio radioWithTitle:@"Title"],
-            bodyRadio = [CPRadio radioWithTitle:@"Body"],
-            labelsRadio = [CPRadio radioWithTitle:@"Labels"],
-            creatorRadio = [CPRadio radioWithTitle:@"Creator"],
-            radioButtons = [allRadio, titleRadio, bodyRadio, creatorRadio, labelsRadio];
-
-        for (var i=0, count = radioButtons.length; i < count; i++)
-        {
-            var thisRadio = radioButtons[i];
-
-            [thisRadio setAlignment:CPCenterTextAlignment];
-            [thisRadio setValue:radioImageReplace forThemeAttribute:@"image"];
-            [thisRadio setValue:1 forThemeAttribute:@"image-offset"];
-
-            [thisRadio setValue:[CPColor colorWithPatternImage:bezelImage] forThemeAttribute:@"bezel-color" inState:CPThemeStateSelected]
-            [thisRadio setValue:CGInsetMake(0.0, 10.0, 0.0, 10.0) forThemeAttribute:@"content-inset"];
-            [thisRadio setValue:CGSizeMake(0.0, 19.0) forThemeAttribute:@"min-size"];
-
-            [thisRadio setValue:CGSizeMake(0.0, 1.0) forThemeAttribute:@"text-shadow-offset" inState:CPThemeStateBordered];
-            [thisRadio setValue:[CPColor colorWithCalibratedWhite:79.0 / 255.0 alpha:1.0] forThemeAttribute:@"text-color"];
-            [thisRadio setValue:[CPColor colorWithCalibratedWhite:240.0 / 255.0 alpha:1.0] forThemeAttribute:@"text-shadow-color"];
-            [thisRadio setValue:[CPColor colorWithCalibratedWhite:1.0 alpha:1.0] forThemeAttribute:@"text-color" inState:CPThemeStateSelected];
-            [thisRadio setValue:[CPColor colorWithCalibratedWhite:79 / 255.0 alpha:1.0] forThemeAttribute:@"text-shadow-color" inState:CPThemeStateSelected];
-
-            [thisRadio sizeToFit];
-
-            [thisRadio setTarget:self];
-            [thisRadio setAction:@selector(filterBy:)];
-
-            [self addSubview:thisRadio];
-        }
-
-        radioGroup = [allRadio radioGroup];
-        [titleRadio setRadioGroup:radioGroup];
-        [bodyRadio setRadioGroup:radioGroup];
-        [labelsRadio setRadioGroup:radioGroup];
-        [creatorRadio setRadioGroup:radioGroup];
-
-        [allRadio setTag:FilterAll];
-        [titleRadio setTag:FilterTitle];
-        [bodyRadio setTag:FilterBody];
-        [creatorRadio setTag:FilterCreator];
-        [labelsRadio setTag:FilterLabels];
-
-        [allRadio setFrameOrigin:CGPointMake(8, 6)];
-        [titleRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([allRadio frame]) + 8, CGRectGetMinY([allRadio frame]))];
-        [bodyRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([titleRadio frame]) + 8, CGRectGetMinY([titleRadio frame]))];
-        [creatorRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([bodyRadio frame]) + 8, CGRectGetMinY([bodyRadio frame]))];
-        [labelsRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([creatorRadio frame]) + 8, CGRectGetMinY([creatorRadio frame]))];
-
-        [allRadio setState:CPOnState];
-    }
-
-    return self;
-}
-
-- (unsigned)selectedFilter
-{
-    return [[radioGroup selectedRadio] tag];
-}
-
-- (void)filterBy:(id)sender
-{
-    [delegate filterBarSelectionDidChange:self];
-}
-
-@end
-
-@implementation TradeDataSource : CPObject
-{
-    CPString fromUser   @accessors;
-    CPString text       @accessors;
-	JSObject trades;
-	JSObject tradesToDisplay;
-	CPArray columnHeaders @accessors;
-}
-- (id)init
-{
-	if(self = [super init])
-	{
-		trades = [];
-		tradesToDisplay = [];
-		[self getTrades];
-	}
-	return self;
-}
-- (void)getTrades
-{
-	var request = [CPURLRequest requestWithURL:requestURL];
-	[[CPURLConnection alloc] initWithRequest:request delegate:self];
-}
-- (void)connection:(CPURLConnection)aConnection didReceiveData:(CPString)data
-{
-    var JSONTrades = CPJSObjectCreateWithJSON(data);
-    // loop through everything and create a dictionary in place of the JSObject adding it to the array
-    for (var i = 0; i < JSONTrades.length; i++)
-        trades[i] = [CPDictionary dictionaryWithJSObject:JSONTrades[i] recursively:NO];
-		
-	tradesToDisplay = trades;
-	
-	if([trades count])
-		columnHeaders = [trades[0] allKeys];
-	
-	[[CPNotificationCenter defaultCenter]
-        postNotificationName:addColumnsNoti object:nil];
-}
-- (void)connection:(CPURLConnection)aConnection didFailWithError:(CPString)error
-{
-    alert(error) ;
-}
-- (int)numberOfRowsInTableView:(CPTableView)tableView
-{
-	return [tradesToDisplay count];
-}
-- (id)tableView:(CPTableView)tableView objectValueForTableColumn:(CPTableColumn)tableColumn row:(int)row
-{
-	var key = [tableColumn identifier];
-	return [tradesToDisplay[row] objectForKey:key];
-}
-// when the sort descriptor changes we need to sort our data
-- (void)tableView:(CPTableView)aTableView sortDescriptorsDidChange:(CPArray)oldDescriptors
-{
-    // first we figure out how we're suppose to sort, then sort the data array
-    var newDescriptors = [aTableView sortDescriptors];
-    [trades sortUsingDescriptors:newDescriptors];
-
-    // the reload the table data
-	[aTableView reloadData];
-}
-- (BOOL)matchFound:(CPDictionary)aDict withString:(CPString)aString
-{
-	var isFound = NO;
-	for(var i=0;i < [aDict count];i++)
-		if([[aDict allValues] objectAtIndex:i] != [CPNull null])
-			if([[[aDict allValues] objectAtIndex:i] lowercaseString].match(aString))
-				isFound = YES;
-	return isFound;
-}
-- (void)searchChanged:(id)sender
-{
-	var searchString;
-    if (sender)
-        searchString = [[sender stringValue]  lowercaseString];
-
-	if(searchString){		
-		tradesToDisplay = [];
-		var count = 0;
-		for(var i=0;i < [trades count];i++)
-			if([self matchFound:trades[i] withString:searchString]){
-				tradesToDisplay[count] = trades[i];
-				count++;
-			}
-		[[CPNotificationCenter defaultCenter]
-			postNotificationName:reloadTableNoti object:nil];
-	}
-	else{
-		tradesToDisplay = trades;
-		[[CPNotificationCenter defaultCenter]
-			postNotificationName:reloadTableNoti object:nil];
-		[[CPNotificationCenter defaultCenter]
-			postNotificationName:hideFilterBarNoti object:nil];	
-	}
-}
-- (void) filterBarSelectionDidChange:(id)sender
-{
-	console.log('add code here');
-}
-@end
-
 @implementation AppController : CPObject
 {
 	CPSplitView verticalSplitter;
@@ -235,7 +37,7 @@ FilterCreator = 4;
 	CPWebViewFix webView;
 	CPTableView tableView;
 	CPScrollView scrollView;
-	TradeDataSource tradeDS;
+	ListDataSource listDS;
 	JSObject headerColor;
 	FilterBar   filterBar;
 }
@@ -263,12 +65,12 @@ FilterCreator = 4;
                    name:hideFilterBarNoti
                  object:nil];				 
 
-	tradeDS = [[TradeDataSource alloc] init];
+	listDS = [[ListDataSource alloc] init];
 	headerColor = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[[CPBundle mainBundle] pathForResource:@"button-bezel-center.png"]]]; 
 
 	filterBar = [[FilterBar alloc] initWithFrame:CGRectMake(0, 0, 400, 32)];
     [filterBar setAutoresizingMask:CPViewWidthSizable];
-    [filterBar setDelegate:tradeDS];
+    [filterBar setDelegate:listDS];
 	
     // create the search field
     var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(0, 10, 200, 30)];
@@ -277,7 +79,7 @@ FilterCreator = 4;
 	[searchField setBordered:YES];
 	[searchField setBezeled:YES];
 	[searchField setFont:[CPFont systemFontOfSize:12.0]];
-	[searchField setTarget:tradeDS];
+	[searchField setTarget:listDS];
 	[searchField setAction:@selector(searchChanged:)];
 	[searchField setSendsWholeSearchString:NO]; 
 
@@ -315,7 +117,7 @@ FilterCreator = 4;
     [scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable]; 
     // create the CPTableView
     tableView = [[CPTableView alloc] initWithFrame:[scrollView bounds]];
-    [tableView setDataSource:tradeDS];
+    [tableView setDataSource:listDS];
     [tableView setUsesAlternatingRowBackgroundColors:YES];
     [[tableView cornerView] setBackgroundColor:headerColor];
 	[tableView setAllowsMultipleSelection:YES];
@@ -354,12 +156,12 @@ FilterCreator = 4;
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
-	//[webView setMainFrameURL:@"/tacticalTrades.php"];
+	//[webView setMainFrameURL:@"/tacticalLists.php"];
 }
 - (void)addColumns:(CPNotification)aNotification
 {
-	for(var i=0;i < [[tradeDS columnHeaders] count];i++){
-		var headerKey = [[tradeDS columnHeaders] objectAtIndex:i];
+	for(var i=0;i < [[listDS columnHeaders] count];i++){
+		var headerKey = [[listDS columnHeaders] objectAtIndex:i];
 		var desc = [CPSortDescriptor sortDescriptorWithKey:headerKey ascending:NO];
 		var column = [[CPTableColumn alloc] initWithIdentifier:headerKey];
 		[[column headerView] setStringValue:headerKey];

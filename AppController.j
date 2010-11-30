@@ -8,7 +8,7 @@
 
 @import <Foundation/CPObject.j>
 
-requestURL = @"php/getJSON.php";
+requestURL = @"https://dollar.isye.gatech.edu/nutch2/ofosho/ChartPlotter/php/getJSON.php";
 addColumnsNot = @"AddColumnsNotification";
 reloadTableNot = @"ReloadTableNotification";
 
@@ -118,6 +118,7 @@ reloadTableNot = @"ReloadTableNotification";
 	CPSplitView horizontalSplitter;
 	CPWebViewFix webView;
 	CPTableView tableView;
+	CPScrollView scrollView;
 	TradeDataSource tradeDS;
 	var headerColor;
 }
@@ -182,7 +183,7 @@ reloadTableNot = @"ReloadTableNotification";
 	[horizontalSplitter setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ]; 
 
     // create a CPScrollView that will contain the CPTableView
-    var scrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
+    scrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
     [scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable]; 
     // create the CPTableView
     tableView = [[CPTableView alloc] initWithFrame:[scrollView bounds]];
@@ -224,7 +225,7 @@ reloadTableNot = @"ReloadTableNotification";
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
-	[webView setMainFrameURL:@"/tacticalTrades.php"];
+	//[webView setMainFrameURL:@"/tacticalTrades.php"];
 }
 - (void)addColumns:(CPNotification)aNotification
 {

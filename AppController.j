@@ -8,9 +8,10 @@
 
 @import <Foundation/CPObject.j>
 
-requestURL = @"https://dollar.isye.gatech.edu/nutch2/ofosho/ChartPlotter/php/getJSON.php";
-addColumnsNot = @"AddColumnsNotification";
-reloadTableNot = @"ReloadTableNotification";
+requestURL = @"php/getJSON.php";
+addColumnsNoti = @"AddColumnsNotification";
+reloadTableNoti = @"ReloadTableNotification";
+hideFilterBarNoti = @"HideFilterBarNotification";
 
 @implementation CPWebViewFix : CPWebView
 - (void)_loadMainFrameURL
@@ -27,6 +28,104 @@ reloadTableNot = @"ReloadTableNotification";
 }
 @end
 
+
+@import <AppKit/CPView.j>
+
+FilterAll = 0;
+FilterTitle = 1;
+FilterBody = 2;
+FilterLabels = 3;
+FilterCreator = 4;
+
+@implementation FilterBar : CPView
+{
+    id delegate @accessors;
+    CPRadioGroup radioGroup;
+}
+
+- (id)initWithFrame:(CGRect)aFrame
+{
+    if (self = [super initWithFrame:aFrame])
+    {
+        var bundle = [CPBundle mainBundle],
+            headerImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:"filterBarBackground.png"] size:CGSizeMake(1, 32)],
+            leftCapImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"MediaFilterLeftCap.png"] size:CGSizeMake(9, 19)],
+            rightCapImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"MediaFilterRightCap.png"] size:CGSizeMake(9, 19)],
+            centerImage = [[CPImage alloc] initWithContentsOfFile:[bundle pathForResource:@"MediaFilterCenter.png"] size:CGSizeMake(1, 19)],
+            bezelImage = [[CPThreePartImage alloc] initWithImageSlices:[leftCapImage, centerImage, rightCapImage] isVertical:NO],
+            radioImageReplace = [[CPImage alloc] init];
+
+        [self setBackgroundColor:[CPColor colorWithPatternImage:headerImage]];
+
+        var allRadio = [CPRadio radioWithTitle:@"All"],
+            titleRadio = [CPRadio radioWithTitle:@"Title"],
+            bodyRadio = [CPRadio radioWithTitle:@"Body"],
+            labelsRadio = [CPRadio radioWithTitle:@"Labels"],
+            creatorRadio = [CPRadio radioWithTitle:@"Creator"],
+            radioButtons = [allRadio, titleRadio, bodyRadio, creatorRadio, labelsRadio];
+
+        for (var i=0, count = radioButtons.length; i < count; i++)
+        {
+            var thisRadio = radioButtons[i];
+
+            [thisRadio setAlignment:CPCenterTextAlignment];
+            [thisRadio setValue:radioImageReplace forThemeAttribute:@"image"];
+            [thisRadio setValue:1 forThemeAttribute:@"image-offset"];
+
+            [thisRadio setValue:[CPColor colorWithPatternImage:bezelImage] forThemeAttribute:@"bezel-color" inState:CPThemeStateSelected]
+            [thisRadio setValue:CGInsetMake(0.0, 10.0, 0.0, 10.0) forThemeAttribute:@"content-inset"];
+            [thisRadio setValue:CGSizeMake(0.0, 19.0) forThemeAttribute:@"min-size"];
+
+            [thisRadio setValue:CGSizeMake(0.0, 1.0) forThemeAttribute:@"text-shadow-offset" inState:CPThemeStateBordered];
+            [thisRadio setValue:[CPColor colorWithCalibratedWhite:79.0 / 255.0 alpha:1.0] forThemeAttribute:@"text-color"];
+            [thisRadio setValue:[CPColor colorWithCalibratedWhite:240.0 / 255.0 alpha:1.0] forThemeAttribute:@"text-shadow-color"];
+            [thisRadio setValue:[CPColor colorWithCalibratedWhite:1.0 alpha:1.0] forThemeAttribute:@"text-color" inState:CPThemeStateSelected];
+            [thisRadio setValue:[CPColor colorWithCalibratedWhite:79 / 255.0 alpha:1.0] forThemeAttribute:@"text-shadow-color" inState:CPThemeStateSelected];
+
+            [thisRadio sizeToFit];
+
+            [thisRadio setTarget:self];
+            [thisRadio setAction:@selector(filterBy:)];
+
+            [self addSubview:thisRadio];
+        }
+
+        radioGroup = [allRadio radioGroup];
+        [titleRadio setRadioGroup:radioGroup];
+        [bodyRadio setRadioGroup:radioGroup];
+        [labelsRadio setRadioGroup:radioGroup];
+        [creatorRadio setRadioGroup:radioGroup];
+
+        [allRadio setTag:FilterAll];
+        [titleRadio setTag:FilterTitle];
+        [bodyRadio setTag:FilterBody];
+        [creatorRadio setTag:FilterCreator];
+        [labelsRadio setTag:FilterLabels];
+
+        [allRadio setFrameOrigin:CGPointMake(8, 6)];
+        [titleRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([allRadio frame]) + 8, CGRectGetMinY([allRadio frame]))];
+        [bodyRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([titleRadio frame]) + 8, CGRectGetMinY([titleRadio frame]))];
+        [creatorRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([bodyRadio frame]) + 8, CGRectGetMinY([bodyRadio frame]))];
+        [labelsRadio setFrameOrigin:CGPointMake(CGRectGetMaxX([creatorRadio frame]) + 8, CGRectGetMinY([creatorRadio frame]))];
+
+        [allRadio setState:CPOnState];
+    }
+
+    return self;
+}
+
+- (unsigned)selectedFilter
+{
+    return [[radioGroup selectedRadio] tag];
+}
+
+- (void)filterBy:(id)sender
+{
+    [delegate filterBarSelectionDidChange:self];
+}
+
+@end
+
 @implementation TradeDataSource : CPObject
 {
     CPString fromUser   @accessors;
@@ -40,7 +139,7 @@ reloadTableNot = @"ReloadTableNotification";
 	if(self = [super init])
 	{
 		trades = [];
-		tradeToDisplay = [];
+		tradesToDisplay = [];
 		[self getTrades];
 	}
 	return self;
@@ -63,7 +162,7 @@ reloadTableNot = @"ReloadTableNotification";
 		columnHeaders = [trades[0] allKeys];
 	
 	[[CPNotificationCenter defaultCenter]
-        postNotificationName:addColumnsNot object:nil];
+        postNotificationName:addColumnsNoti object:nil];
 }
 - (void)connection:(CPURLConnection)aConnection didFailWithError:(CPString)error
 {
@@ -99,16 +198,32 @@ reloadTableNot = @"ReloadTableNotification";
 }
 - (void)searchChanged:(id)sender
 {
-	var searchString = [[sender stringValue] lowercaseString];
-	tradesToDisplay = [];
-	var count = 0;
-	for(var i=0;i < [trades count];i++)
-		if([self matchFound:trades[i] withString:searchString]){
-			tradesToDisplay[count] = trades[i];
-			count++;
-		}
-	[[CPNotificationCenter defaultCenter]
-        postNotificationName:reloadTableNot object:nil];
+	var searchString;
+    if (sender)
+        searchString = [[sender stringValue]  lowercaseString];
+
+	if(searchString){		
+		tradesToDisplay = [];
+		var count = 0;
+		for(var i=0;i < [trades count];i++)
+			if([self matchFound:trades[i] withString:searchString]){
+				tradesToDisplay[count] = trades[i];
+				count++;
+			}
+		[[CPNotificationCenter defaultCenter]
+			postNotificationName:reloadTableNoti object:nil];
+	}
+	else{
+		tradesToDisplay = trades;
+		[[CPNotificationCenter defaultCenter]
+			postNotificationName:reloadTableNoti object:nil];
+		[[CPNotificationCenter defaultCenter]
+			postNotificationName:hideFilterBarNoti object:nil];	
+	}
+}
+- (void) filterBarSelectionDidChange:(id)sender
+{
+	console.log('add code here');
 }
 @end
 
@@ -116,11 +231,13 @@ reloadTableNot = @"ReloadTableNotification";
 {
 	CPSplitView verticalSplitter;
 	CPSplitView horizontalSplitter;
+	CPView scrollParentView;
 	CPWebViewFix webView;
 	CPTableView tableView;
 	CPScrollView scrollView;
 	TradeDataSource tradeDS;
-	var headerColor;
+	JSObject headerColor;
+	FilterBar   filterBar;
 }
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
@@ -131,18 +248,28 @@ reloadTableNot = @"ReloadTableNotification";
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
                selector:@selector(reloadTable:)
-                   name:reloadTableNot
+                   name:reloadTableNoti
                  object:nil];
 				 
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
                selector:@selector(addColumns:)
-                   name:addColumnsNot 
+                   name:addColumnsNoti 
                  object:nil];
+
+	[[CPNotificationCenter defaultCenter ]
+            addObserver:self
+               selector:@selector(hideFilterBar:)
+                   name:hideFilterBarNoti
+                 object:nil];				 
 
 	tradeDS = [[TradeDataSource alloc] init];
 	headerColor = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[[CPBundle mainBundle] pathForResource:@"button-bezel-center.png"]]]; 
-				 
+
+	filterBar = [[FilterBar alloc] initWithFrame:CGRectMake(0, 0, 400, 32)];
+    [filterBar setAutoresizingMask:CPViewWidthSizable];
+    [filterBar setDelegate:tradeDS];
+	
     // create the search field
     var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(0, 10, 200, 30)];
 	[searchField setEditable:YES];
@@ -182,6 +309,7 @@ reloadTableNot = @"ReloadTableNotification";
 	[horizontalSplitter setVertical:NO]; 
 	[horizontalSplitter setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ]; 
 
+	scrollParentView = [[CPView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
     // create a CPScrollView that will contain the CPTableView
     scrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0.0, 0, CGRectGetWidth([horizontalSplitter bounds]), 300.0)];
     [scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable]; 
@@ -207,7 +335,8 @@ reloadTableNot = @"ReloadTableNotification";
 	[leftView addSubview:button2];
     [leftView addSubview:searchField];
 	// add scrollView/webView to right side of page
-	[horizontalSplitter addSubview:scrollView];
+	[scrollParentView addSubview:scrollView];
+	[horizontalSplitter addSubview:scrollParentView];
 	[horizontalSplitter addSubview:webView];
 	// add horizontal view into right view in order to split it in half
 	[rightView addSubview:horizontalSplitter];
@@ -246,6 +375,34 @@ reloadTableNot = @"ReloadTableNotification";
 }
 - (void)reloadTable:(CPNotification)aNotification
 {	
-    [tableView reloadData];  
+	[self showFilterBar];
+    [tableView reloadData];	
+}
+- (void)showFilterBar
+{
+    if ([filterBar superview])
+        return;
+
+    [filterBar setFrame:CGRectMake(0, 0, CGRectGetWidth([scrollParentView frame]), 32)];
+    [scrollParentView addSubview:filterBar];
+
+    var frame = [scrollView frame];
+
+    frame.origin.y = 32;
+    frame.size.height -= 32;
+    [scrollView setFrame:frame];
+}
+- (void)hideFilterBar:(CPNotification)aNotification
+{
+    if (![filterBar superview])
+        return;
+
+    [filterBar removeFromSuperview];
+
+    var frame = [scrollView frame];
+
+    frame.origin.y = 0;
+    frame.size.height += 32;
+    [scrollView setFrame:frame];
 }
 @end

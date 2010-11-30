@@ -92,14 +92,16 @@
 	$files = Array();
 	foreach ($iterator as $file) {
 		if($file->isFile()){
-			$temp = Array();
-			$temp['Name'] =  $file->getFileName();
-			$temp['Owner'] = (string)$file->getOwner();
-			$temp['Group'] = (string)$file->getGroup();
-			$temp['Size'] = (string)$file->getSize();
-			$temp['Modified'] = date("F j, Y, g:i a",$file->getMTime());
-			$temp['Permissions'] = perms2string($file->getPerms());
-			$files[] = $temp;
+			if(substr($file, strrpos($file, '.') + 1) == "csv"){
+				$temp = Array();
+				$temp['Name'] =  $file->getFileName();
+				$temp['Owner'] = (string)$file->getOwner();
+				$temp['Group'] = (string)$file->getGroup();
+				$temp['Size'] = (string)$file->getSize();
+				$temp['Modified'] = date("F j, Y, g:i a",$file->getMTime());
+				$temp['Permissions'] = perms2string($file->getPerms());
+				$files[] = $temp;
+			}
 		}
 	}
 	echo array2json($files);

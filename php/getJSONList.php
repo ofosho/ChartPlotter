@@ -45,7 +45,10 @@
 					(($perms & 0x0200) ? 'T' : '-'));
 		return $info;
 	}
-	$dir_iterator = new RecursiveDirectoryIterator("../files");
+
+	$curdir = $_GET['group'];
+	
+	$dir_iterator = new RecursiveDirectoryIterator("../files/" . $_GET['group']);
 	$iterator = new RecursiveIteratorIterator($dir_iterator, RecursiveIteratorIterator::SELF_FIRST);
 
 	$files = Array();
@@ -53,7 +56,8 @@
 		if($file->isFile()){
 			if(substr($file, strrpos($file, '.') + 1) == "csv"){
 				$temp = Array();
-				$temp['Name'] =  $file->getFileName();
+				$temp['Name'] =  basename($file->getFileName(),'.csv');
+				$temp['Folder'] = $curdir;
 				$temp['Owner'] = (string)$file->getOwner();
 				$temp['Group'] = (string)$file->getGroup();
 				$temp['Size'] = (string)$file->getSize();
@@ -62,6 +66,8 @@
 				$files[] = $temp;
 			}
 		}
+		else
+			$curdir = $file->getFilename();
 	}
 	echo json_encode($files);
 ?>

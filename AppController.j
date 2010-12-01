@@ -78,6 +78,12 @@
 {
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
+               selector:@selector(reloadGroups:)
+                   name:reloadGroupsNoti
+                 object:nil];
+				 
+	[[CPNotificationCenter defaultCenter ]
+            addObserver:self
                selector:@selector(reloadTable:)
                    name:reloadTableNoti
                  object:nil];
@@ -90,21 +96,63 @@
 
 	[[CPNotificationCenter defaultCenter ]
             addObserver:self
+               selector:@selector(showFilterBar:)
+                   name:showFilterBarNoti
+                 object:nil];
+				 
+	[[CPNotificationCenter defaultCenter ]
+            addObserver:self
                selector:@selector(hideFilterBar:)
                    name:hideFilterBarNoti
                  object:nil];
 }
-- (void)openIssueInNewWindow:(id)sender
+- (@action)openIssueInNewWindow:(id)sender
 {
+    var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(100, 100, 800, 600) styleMask:CPTitledWindowMask|CPClosableWindowMask|CPMiniaturizableWindowMask|CPResizableWindowMask];
+    [newWindow setMinSize:CGSizeMake(300, 300)];
+
+	var platformWindow = [[CPPlatformWindow alloc] initWithContentRect:CGRectMake(100, 100, 800, 600)];
+	[newWindow setPlatformWindow:platformWindow];
+	[newWindow setFullBridge:YES];
+
+    var contentView = [newWindow contentView],
+        webViewWin = [[CPWebViewFix alloc] initWithFrame:[contentView bounds]];
+
+    [webViewWin setAutoresizingMask:CPViewWidthSizable|CPViewHeightSizable];
+    [contentView addSubview:webViewWin];
+	[webViewWin setScrollMode:CPWebViewScrollAppKit]; 
+
+    [newWindow orderFront:self];
+    [newWindow setDelegate:webViewWin];
+	
+	var i = [[tableView selectedRowIndexes] firstIndex];
+	var row = [[listDS objsToDisplay] objectAtIndex:i];
+	[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
+	[newWindow setTitle:@"File:"+[row objectForKey:"Name"]];
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
-	//[webView setMainFrameURL:@"/tacticalLists.php"];
+	if(groupView === [aNotification object]){
+		var i = [[[aNotification object] selectedRowIndexes] firstIndex];
+		[listDS getList:[[groupDS objs] objectAtIndex:i]];
+		[searchField setStringValue:@""];
+		[self hideFilterBar:nil];
+	}
+	else{
+		var i = [[[aNotification object] selectedRowIndexes] firstIndex];
+		if(i > -1){
+			var row = [[listDS objsToDisplay] objectAtIndex:i];
+			[webView setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
+		}
+	}
 }
 - (void)reloadTable:(CPNotification)aNotification
 {	
-	[self showFilterBar];
     [tableView reloadData];	
+}
+- (void)reloadGroups:(CPNotification)aNotification
+{	
+    [groupView reloadData];	
 }
 - (void)hideFilterBar:(CPNotification)aNotification
 {
@@ -119,7 +167,7 @@
 	
     [scrollView setFrame:frame];
 }
-- (void)showFilterBar
+- (void)showFilterBar:(CPNotification)aNotification
 {
     if ([filterBar superview])
         return;
@@ -152,7 +200,7 @@
 }
 - (void)createGroupView
 {
-	groupScrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 50, CGRectGetWidth([leftView bounds]), CGRectGetHeight([leftView bounds]))];
+	groupScrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 50, CGRectGetWidth([leftView bounds]), CGRectGetHeight([leftView bounds])-50)];
 	[groupScrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
 	[groupScrollView setAutohidesScrollers:YES];
 
@@ -160,7 +208,9 @@
 	[groupView setIntercellSpacing:CGSizeMakeZero()];
     [groupView setHeaderView:nil];
     [groupView setCornerView:nil];
+	[groupView setDelegate:self];
 	[groupView setDataSource:groupDS];
+	[groupView setAllowsEmptySelection:NO];
 
     var column = [[CPTableColumn alloc] initWithIdentifier:groupColId];
     [column setWidth:220.0];
@@ -183,6 +233,7 @@
     // create the CPTableView
     tableView = [[CPTableView alloc] initWithFrame:[scrollView bounds]];
     [tableView setDataSource:listDS];
+	[tableView setAllowsEmptySelection:NO];
     [tableView setUsesAlternatingRowBackgroundColors:YES];
     [[tableView cornerView] setBackgroundColor:headerColor];
 	[tableView setAllowsMultipleSelection:YES];

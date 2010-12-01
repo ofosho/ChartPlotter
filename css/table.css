@@ -1,0 +1,28 @@
+/* tables */
+table {
+	/*table-layout: fixed;*/
+	border: 1px solid #CDCDCD;
+	font-family:arial;
+	font-size: 9pt;
+	text-align: left;
+}
+table thead tr th, table tr th {
+	background-color: #e6EEEE;
+	border:1px solid #CDCDCD;
+	font-size: 9pt;
+	padding: 4px;
+}
+tr.rowodd td{
+	padding: 4px;
+	border:1px solid #CDCDCD;
+	background-color: #FFF;
+	vertical-align: top;
+}
+tr.roweven td{
+	padding: 4px;
+	border:1px solid #CDCDCD;
+	background-color:#e6EEEE;
+	vertical-align: top;
+}
+
+

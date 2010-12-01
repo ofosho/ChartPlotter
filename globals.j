@@ -1,9 +1,12 @@
 //Define Globals
-requestURL = @"php/getJSON.php";
+requestListURL = @"php/getJSONList.php";
+requestGroupURL = @"php/getJSONGroup.php";
 groupColId = @"group";
 
 addColumnsNoti = @"AddColumnsNotification";
 reloadTableNoti = @"ReloadTableNotification";
+reloadGroupsNoti = @"ReloadGroupsNotification";
+showFilterBarNoti = @"ShowFilterBarNotification";
 hideFilterBarNoti = @"HideFilterBarNotification";
 
 FilterAll = 0;

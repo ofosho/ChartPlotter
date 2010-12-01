@@ -1,9 +1,7 @@
 @implementation ListDataSource : CPObject
 {
-    CPString fromUser   @accessors;
-    CPString text       @accessors;
 	JSObject objs;
-	JSObject objsToDisplay;
+	JSObject objsToDisplay @accessors;
 	CPArray columnHeaders @accessors;
 }
 - (id)init
@@ -12,17 +10,21 @@
 	{
 		objs = [];
 		objsToDisplay = [];
-		[self getLists];
+		[self getList:@""];
 	}
 	return self;
 }
-- (void)getLists
+- (void)getList:(CPString)aGroup
 {
-	var request = [CPURLRequest requestWithURL:requestURL];
+	if(aGroup == "All")
+		aGroup = "";
+
+	var request = [CPURLRequest requestWithURL:requestListURL+"?group="+aGroup];
 	[[CPURLConnection alloc] initWithRequest:request delegate:self];
 }
 - (void)connection:(CPURLConnection)aConnection didReceiveData:(CPString)data
 {
+	objs = [];
     var JSONLists = CPJSObjectCreateWithJSON(data);
     // loop through everything and create a dictionary in place of the JSObject adding it to the array
     for (var i = 0; i < JSONLists.length; i++)
@@ -30,11 +32,15 @@
 		
 	objsToDisplay = objs;
 	
-	if([objs count])
+	if([objs count] && !columnHeaders){
 		columnHeaders = [objs[0] allKeys];
-	
-	[[CPNotificationCenter defaultCenter]
-        postNotificationName:addColumnsNoti object:nil];
+		[[CPNotificationCenter defaultCenter]
+			postNotificationName:addColumnsNoti object:nil];
+	}
+	else{
+		[[CPNotificationCenter defaultCenter]
+			postNotificationName:reloadTableNoti object:nil];
+	}
 }
 - (void)connection:(CPURLConnection)aConnection didFailWithError:(CPString)error
 {
@@ -49,14 +55,12 @@
 	var key = [tableColumn identifier];
 	return [objsToDisplay[row] objectForKey:key];
 }
-// when the sort descriptor changes we need to sort our data
 - (void)tableView:(CPTableView)aTableView sortDescriptorsDidChange:(CPArray)oldDescriptors
 {
     // first we figure out how we're suppose to sort, then sort the data array
     var newDescriptors = [aTableView sortDescriptors];
     [objs sortUsingDescriptors:newDescriptors];
 
-    // the reload the table data
 	[aTableView reloadData];
 }
 - (BOOL)matchFound:(CPDictionary)aDict withString:(CPString)aString
@@ -82,6 +86,8 @@
 				objsToDisplay[count] = objs[i];
 				count++;
 			}
+		[[CPNotificationCenter defaultCenter]
+			postNotificationName:showFilterBarNoti object:nil];	
 		[[CPNotificationCenter defaultCenter]
 			postNotificationName:reloadTableNoti object:nil];
 	}

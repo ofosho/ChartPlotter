@@ -13,12 +13,14 @@
 @import "GroupDataSource.j"
 @import "globals.j"
 
-//CPWebView changes style on _loadMainFrameURL
-//this override removes that line
-@implementation CPWebViewFix : CPWebView
+//CPWebView with style change to ScrollAppKit
+//and setRepresentedObject method for collectionview
+@implementation DetailsWebView : CPWebView
 - (void)_loadMainFrameURL
 {
 	[self _startedLoading];
+	
+	[self setScrollMode:CPWebViewScrollAppKit]; 
 
 	_ignoreLoadStart = YES;
 	_ignoreLoadEnd = NO;
@@ -28,8 +30,11 @@
 
 	[self _load];
 }
+- (void)setRepresentedObject:(id)anObject
+{
+	[self setMainFrameURL:anObject];
+}
 @end
-
 @implementation AppController : CPObject
 {
 	CPSplitView verticalSplitter;
@@ -38,7 +43,7 @@
 	CPView leftView;
 	CPView rightView;
 	CPSearchField searchField;
-	CPWebViewFix webView;
+	DetailsWebView webView;
 	CPTableView tableView;
 	CPTableView groupView;
 	CPScrollView scrollView;
@@ -48,7 +53,6 @@
 	JSObject headerColor;
 	FilterBar   filterBar;
 }
-
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
 {
 	var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
@@ -106,7 +110,7 @@
                    name:hideFilterBarNoti
                  object:nil];
 }
-- (@action)openIssueInNewWindow:(id)sender
+- (@action)openDetailInNewWindow:(id)sender
 {
 	var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(100, 100, 800, 600) styleMask:CPTitledWindowMask|CPClosableWindowMask|CPMiniaturizableWindowMask|CPResizableWindowMask];
 	[newWindow setMinSize:CGSizeMake(300, 300)];
@@ -116,11 +120,10 @@
 	[newWindow setFullBridge:YES];
 
 	var contentView = [newWindow contentView],
-		webViewWin = [[CPWebViewFix alloc] initWithFrame:[contentView bounds]];
+		webViewWin = [[DetailsWebView alloc] initWithFrame:[contentView bounds]];
 
 	[webViewWin setAutoresizingMask:CPViewWidthSizable|CPViewHeightSizable];
 	[contentView addSubview:webViewWin];
-	[webViewWin setScrollMode:CPWebViewScrollAppKit]; 
 
 	[newWindow orderFront:self];
 	[newWindow setDelegate:webViewWin];
@@ -129,31 +132,42 @@
 	var row = [[listDS objsToDisplay] objectAtIndex:i];
 	[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
 }
-- (@action)openIssuesInNewWindow
+- (@action)openDetailsInNewWindow
 {
-	var platformWin = [[CPPlatformWindow alloc] init];
+	var platformWindow = [[CPPlatformWindow alloc] initWithContentRect:CGRectMake(0, 0, 600, 800)];
+	var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask];
+	[newWindow setPlatformWindow:platformWindow];
+	[newWindow setFullBridge:YES];
+	[newWindow orderFront:self];
+	var contentView = [newWindow contentView],
+		bounds = [contentView bounds];
+	
+	var plotsView = [[CPCollectionView alloc] initWithFrame:bounds];       
+	[plotsView setAutoresizingMask:CPViewWidthSizable];
+	[plotsView setMinItemSize:CGSizeMake(300, 300)];
+	[plotsView setMaxItemSize:CGSizeMake(300, 300)];
+	
+	var itemPrototype = [[CPCollectionViewItem alloc] init],
+            plotView = [[DetailsWebView alloc] initWithFrame:CGRectMakeZero()];
+        
+    [itemPrototype setView:plotView];       
+    [plotsView setItemPrototype:itemPrototype];
+	
+	var scrollView = [[CPScrollView alloc] initWithFrame:bounds];       
+	[scrollView setDocumentView:plotsView];
+	[scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+	[scrollView setAutohidesScrollers:YES];
+	[contentView addSubview:scrollView];
+	
 	var indices = [tableView selectedRowIndexes];
 	var index = [indices firstIndex];
-	for(var i=0;i < [indices count];i++){
-		var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(300*i, 20, 300, 300) styleMask:CPTitledWindowMask|CPClosableWindowMask|CPMiniaturizableWindowMask|CPResizableWindowMask];
-		[newWindow setMinSize:CGSizeMake(300, 300)];
-		[newWindow setPlatformWindow:platformWin];
-		
-		var contentView = [newWindow contentView],
-			webViewWin = [[CPWebViewFix alloc] initWithFrame:[contentView bounds]];
-		
-		[webViewWin setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-		[contentView addSubview:webViewWin];
-		[webViewWin setScrollMode:CPWebViewScrollAppKit]; 
-
-		[newWindow orderFront:self];
-		[newWindow setDelegate:webViewWin];
-		
-		var row = [[listDS objsToDisplay] objectAtIndex:index];
-		[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
-		[newWindow setTitle:[row objectForKey:"Name"]];
+	var urls = [];
+	for(var i=0;i < [indices count];i++){			
+		var row = [[listDS objsToDisplay] objectAtIndex:index];		
+		urls[i] = @"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"];		
 		index = [indices indexGreaterThanIndex:index];
 	}
+	[plotsView setContent:urls];
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
@@ -227,7 +241,7 @@
 {
     [CPMenu setMenuBarVisible:YES];
 	var theMenu = [[CPApplication sharedApplication] mainMenu];
-	var plotAllMenuItem = [[CPMenuItem alloc] initWithTitle:@"Plot All" action:@selector(openIssuesInNewWindow) keyEquivalent:nil];
+	var plotAllMenuItem = [[CPMenuItem alloc] initWithTitle:@"Plot All" action:@selector(openDetailsInNewWindow) keyEquivalent:nil];
 	[theMenu insertItem:plotAllMenuItem atIndex: 0];
 
 	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"New" ]];
@@ -275,13 +289,12 @@
 	[tableView setAllowsMultipleSelection:YES];
 	[tableView setDelegate:self];
 	[tableView setTarget:self];
-    [tableView setDoubleAction:@selector(openIssueInNewWindow:)];
+    [tableView setDoubleAction:@selector(openDetailInNewWindow:)];
 }
 - (void)createWebView
 {
-	webView = [[CPWebViewFix alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([horizontalSplitter bounds])-16, CGRectGetHeight([horizontalSplitter bounds])-300)];
+	webView = [[DetailsWebView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([horizontalSplitter bounds])-16, CGRectGetHeight([horizontalSplitter bounds])-300)];
 	[webView setAutoresizingMask: CPViewWidthSizable | CPViewMinYMargin | CPViewMaxYMargin];
-	[webView setScrollMode:CPWebViewScrollAppKit]; 
 }
 - (void)createSearchField
 {

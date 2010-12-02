@@ -45,29 +45,41 @@
 					(($perms & 0x0200) ? 'T' : '-'));
 		return $info;
 	}
-
-	$curdir = $_GET['group'];
 	
-	$dir_iterator = new RecursiveDirectoryIterator("../files/" . $_GET['group']);
-	$iterator = new RecursiveIteratorIterator($dir_iterator, RecursiveIteratorIterator::SELF_FIRST);
-
-	$files = Array();
-	foreach ($iterator as $file) {
-		if($file->isFile()){
-			if(substr($file, strrpos($file, '.') + 1) == "csv"){
-				$temp = Array();
-				$temp['Name'] =  basename($file->getFileName(),'.csv');
-				$temp['Folder'] = $curdir;
-				$temp['Owner'] = (string)$file->getOwner();
-				$temp['Group'] = (string)$file->getGroup();
-				$temp['Size'] = (string)$file->getSize();
-				$temp['Modified'] = date("F j, Y, g:i a",$file->getMTime());
-				$temp['Permissions'] = perms2string($file->getPerms());
-				$files[] = $temp;
+	function directoryToArray($directory, $recursive=true) {
+		$array_items = array();
+		if ($handle = opendir($directory)) {
+			while (false !== ($file = readdir($handle))) {
+				if ($file != "." && $file != "..") {					
+					if (is_dir($directory. "/" . $file)) {
+						$curdir = $file;
+						if($recursive) {
+							$array_items = array_merge($array_items, directoryToArray($directory. "/" . $file, $recursive));
+						}
+						//Code to include directories in output
+						//$file = $directory . "/" . $file;
+						//$array_items[] = preg_replace("/\/\//si", "/", $file);
+					} else {
+						$file = new SplFileInfo($directory . "/" . $file);
+						if(substr($file, strrpos($file, '.') + 1) == "csv"){
+							$temp = Array();
+							$temp['Name'] =  basename($file->getFileName(),'.csv');
+							$temp['Folder'] = basename($file->getPathInfo());
+							$temp['Owner'] = (string)$file->getOwner();
+							$temp['Group'] = (string)$file->getGroup();
+							$temp['Size'] = (string)$file->getSize();
+							$temp['Modified'] = date("F j, Y, g:i a",$file->getMTime());
+							$temp['Permissions'] = perms2string($file->getPerms());
+							$array_items[] = $temp;
+						}
+					}
+				}
 			}
+			closedir($handle);
 		}
-		else
-			$curdir = $file->getFilename();
+		return $array_items;
 	}
+
+	$files = directoryToArray("../files/". $_GET['group']);
 	echo json_encode($files);
 ?>

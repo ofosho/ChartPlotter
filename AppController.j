@@ -51,6 +51,7 @@
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
 {
+	numWins = 0;
 	var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
 		contentView = [theWindow contentView];
 
@@ -71,8 +72,8 @@
 	// add vertical splitter (entire page) to contentview
 	[contentView addSubview:verticalSplitter];
 
+	[self createMenu];
 	[theWindow orderFront:self];
-	[CPMenu setMenuBarVisible:YES];
 }
 - (void)initNotifications
 {
@@ -108,27 +109,52 @@
 }
 - (@action)openIssueInNewWindow:(id)sender
 {
-    var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(100, 100, 800, 600) styleMask:CPTitledWindowMask|CPClosableWindowMask|CPMiniaturizableWindowMask|CPResizableWindowMask];
-    [newWindow setMinSize:CGSizeMake(300, 300)];
+	var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(100, 100, 800, 600) styleMask:CPTitledWindowMask|CPClosableWindowMask|CPMiniaturizableWindowMask|CPResizableWindowMask];
+	[newWindow setMinSize:CGSizeMake(300, 300)];
 
 	var platformWindow = [[CPPlatformWindow alloc] initWithContentRect:CGRectMake(100, 100, 800, 600)];
 	[newWindow setPlatformWindow:platformWindow];
 	[newWindow setFullBridge:YES];
 
-    var contentView = [newWindow contentView],
-        webViewWin = [[CPWebViewFix alloc] initWithFrame:[contentView bounds]];
+	var contentView = [newWindow contentView],
+		webViewWin = [[CPWebViewFix alloc] initWithFrame:[contentView bounds]];
 
-    [webViewWin setAutoresizingMask:CPViewWidthSizable|CPViewHeightSizable];
-    [contentView addSubview:webViewWin];
+	[webViewWin setAutoresizingMask:CPViewWidthSizable|CPViewHeightSizable];
+	[contentView addSubview:webViewWin];
 	[webViewWin setScrollMode:CPWebViewScrollAppKit]; 
 
-    [newWindow orderFront:self];
-    [newWindow setDelegate:webViewWin];
+	[newWindow orderFront:self];
+	[newWindow setDelegate:webViewWin];
 	
 	var i = [[tableView selectedRowIndexes] firstIndex];
 	var row = [[listDS objsToDisplay] objectAtIndex:i];
 	[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
-	[newWindow setTitle:@"File:"+[row objectForKey:"Name"]];
+}
+- (@action)openIssuesInNewWindow
+{
+	var platformWin = [[CPPlatformWindow alloc] init];
+	var indices = [tableView selectedRowIndexes];
+	var index = [indices firstIndex];
+	for(var i=0;i < [indices count];i++){
+		var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(300*i, 20, 300, 300) styleMask:CPTitledWindowMask|CPClosableWindowMask|CPMiniaturizableWindowMask|CPResizableWindowMask];
+		[newWindow setMinSize:CGSizeMake(300, 300)];
+		[newWindow setPlatformWindow:platformWin];
+		
+		var contentView = [newWindow contentView],
+			webViewWin = [[CPWebViewFix alloc] initWithFrame:[contentView bounds]];
+		
+		[webViewWin setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+		[contentView addSubview:webViewWin];
+		[webViewWin setScrollMode:CPWebViewScrollAppKit]; 
+
+		[newWindow orderFront:self];
+		[newWindow setDelegate:webViewWin];
+		
+		var row = [[listDS objsToDisplay] objectAtIndex:index];
+		[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
+		[newWindow setTitle:[row objectForKey:"Name"]];
+		index = [indices indexGreaterThanIndex:index];
+	}
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
@@ -198,6 +224,17 @@
     [scrollView setDocumentView:tableView]; 
 	[tableView reloadData]; 
 }
+- (void)createMenu
+{
+    [CPMenu setMenuBarVisible:YES];
+	var theMenu = [[CPApplication sharedApplication] mainMenu];
+	var plotAllMenuItem = [[CPMenuItem alloc] initWithTitle:@"Plot All" action:@selector(openIssuesInNewWindow) keyEquivalent:nil];
+	[theMenu insertItem:plotAllMenuItem atIndex: 0];
+
+	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"New" ]];
+	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"Open"]];
+	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"Save"]];
+}
 - (void)createGroupView
 {
 	groupScrollView = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 50, CGRectGetWidth([leftView bounds]), CGRectGetHeight([leftView bounds])-50)];
@@ -211,6 +248,7 @@
 	[groupView setDelegate:self];
 	[groupView setDataSource:groupDS];
 	[groupView setAllowsEmptySelection:NO];
+	[groupView setBackgroundColor:[CPColor colorWithHexString:@"EBF3F5"]];
 
     var column = [[CPTableColumn alloc] initWithIdentifier:groupColId];
     [column setWidth:220.0];
@@ -219,7 +257,6 @@
     [groupView addTableColumn:column];
     [groupView setColumnAutoresizingStyle:CPTableViewLastColumnOnlyAutoresizingStyle];
     [groupView setRowHeight:26.0];
-    [groupView setSelectionHighlightStyle:CPTableViewSelectionHighlightStyleSourceList];
 	
 	[groupScrollView setDocumentView:groupView];
 }
@@ -276,6 +313,7 @@
 
 	//create left/right views
 	leftView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, 200, CGRectGetHeight([verticalSplitter bounds]))];
+	[leftView setBackgroundColor:[CPColor colorWithHexString:@"CCDDDD"]];
 	rightView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth([verticalSplitter bounds]) - 200, CGRectGetHeight([verticalSplitter bounds]))];
 	[rightView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable ];
 

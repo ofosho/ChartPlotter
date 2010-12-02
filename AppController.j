@@ -51,7 +51,6 @@
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
 {
-	numWins = 0;
 	var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
 		contentView = [theWindow contentView];
 

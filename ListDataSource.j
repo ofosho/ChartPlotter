@@ -1,5 +1,7 @@
 @implementation ListDataSource : CPObject
 {
+	CPString searchFilter;
+	JSObject selFilter;
 	JSObject objs;
 	JSObject objsToDisplay @accessors;
 	CPArray columnHeaders @accessors;
@@ -8,6 +10,8 @@
 {
 	if(self = [super init])
 	{
+		searchFilter = nil;
+		selFilter = 0;
 		objs = [];
 		objsToDisplay = [];
 		[self getList:@""];
@@ -16,7 +20,7 @@
 }
 - (void)getList:(CPString)aGroup
 {
-	if(aGroup == "All")
+	if(aGroup == allName)
 		aGroup = "";
 
 	var request = [CPURLRequest requestWithURL:requestListURL+"?group="+aGroup];
@@ -66,15 +70,20 @@
 - (BOOL)matchFound:(CPDictionary)aDict withString:(CPString)aString
 {
 	var isFound = NO;
-	for(var i=0;i < [aDict count];i++)
-		if([[aDict allValues] objectAtIndex:i] != [CPNull null])
-			if([[[aDict allValues] objectAtIndex:i] lowercaseString].match(aString))
+	if(selFilter){
+		if([aDict objectForKey:[columnHeaders objectAtIndex:selFilter-1]] != [CPNull null])
+			if([[aDict objectForKey:[columnHeaders objectAtIndex:selFilter-1]] lowercaseString].match(aString))
 				isFound = YES;
+	}
+	else
+		for(var i=0;i < [aDict count];i++)
+			if([[aDict allValues] objectAtIndex:i] != [CPNull null])
+				if([[[aDict allValues] objectAtIndex:i] lowercaseString].match(aString))
+					isFound = YES;
 	return isFound;
 }
 - (void)searchChanged:(id)sender
 {
-	var searchString;
     if (sender)
         searchString = [[sender stringValue]  lowercaseString];
 
@@ -101,6 +110,7 @@
 }
 - (void) filterBarSelectionDidChange:(id)sender
 {
-	console.log('add code here');
+	selFilter = [sender selectedFilter];
+	[self searchChanged:nil];
 }
 @end

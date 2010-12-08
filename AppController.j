@@ -20,7 +20,8 @@
 {
 	[self _startedLoading];
 	
-	[self setScrollMode:CPWebViewScrollAppKit]; 
+	//[self setScrollMode:CPWebViewScrollAppKit]; 
+	_iframe.setAttribute("scrolling", "no");
 
 	_ignoreLoadStart = YES;
 	_ignoreLoadEnd = NO;
@@ -63,7 +64,6 @@
 	headerColor = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[[CPBundle mainBundle] pathForResource:@"button-bezel-center.png"]]]; 
 
 	[self initNotifications];	
-	[self createFilterBar];
 	[self createSearchField];
 	[self splitPage:[contentView bounds]];
 	[self createGroupView];
@@ -130,9 +130,9 @@
 	
 	var i = [[tableView selectedRowIndexes] firstIndex];
 	var row = [[listDS objsToDisplay] objectAtIndex:i];
-	[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
+	[webViewWin setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:groupColHeaderName]+"&file="+[row objectForKey:"Name"]];
 }
-- (@action)openDetailsInNewWindow
+- (@action)openDetailsInNewWindow:(id)sender
 {
 	var platformWindow = [[CPPlatformWindow alloc] initWithContentRect:CGRectMake(0, 0, 600, 800)];
 	var newWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask];
@@ -144,8 +144,8 @@
 	
 	var plotsView = [[CPCollectionView alloc] initWithFrame:bounds];       
 	[plotsView setAutoresizingMask:CPViewWidthSizable];
-	[plotsView setMinItemSize:CGSizeMake(300, 300)];
-	[plotsView setMaxItemSize:CGSizeMake(300, 300)];
+	[plotsView setMinItemSize:CGSizeMake(collViewWidth, collViewHeight)];
+	[plotsView setMaxItemSize:CGSizeMake(collViewWidth, collViewHeight)];
 	
 	var itemPrototype = [[CPCollectionViewItem alloc] init],
             plotView = [[DetailsWebView alloc] initWithFrame:CGRectMakeZero()];
@@ -153,19 +153,27 @@
     [itemPrototype setView:plotView];       
     [plotsView setItemPrototype:itemPrototype];
 	
-	var scrollView = [[CPScrollView alloc] initWithFrame:bounds];       
-	[scrollView setDocumentView:plotsView];
-	[scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-	[scrollView setAutohidesScrollers:YES];
-	[contentView addSubview:scrollView];
-	
-	var indices = [tableView selectedRowIndexes];
-	var index = [indices firstIndex];
+	var scrollViewDetails = [[CPScrollView alloc] initWithFrame:bounds];       
+	[scrollViewDetails setDocumentView:plotsView];
+	[scrollViewDetails setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+	[scrollViewDetails setAutohidesScrollers:YES];
+	[contentView addSubview:scrollViewDetails];
+
 	var urls = [];
-	for(var i=0;i < [indices count];i++){			
-		var row = [[listDS objsToDisplay] objectAtIndex:index];		
-		urls[i] = @"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"];		
-		index = [indices indexGreaterThanIndex:index];
+	if([sender title] == plotAll){
+		for(var i=0;i < [[listDS objsToDisplay] count];i++){
+			var row = [[listDS objsToDisplay] objectAtIndex:i];		
+			urls[i] = @"php/tradeReport.php?group="+[row objectForKey:groupColHeaderName]+"&file="+[row objectForKey:"Name"];
+		}
+	}
+	else{
+		var indices = [tableView selectedRowIndexes];
+		var index = [indices firstIndex];
+		for(var i=0;i < [indices count];i++){			
+			var row = [[listDS objsToDisplay] objectAtIndex:index];		
+			urls[i] = @"php/tradeReport.php?group="+[row objectForKey:groupColHeaderName]+"&file="+[row objectForKey:"Name"];		
+			index = [indices indexGreaterThanIndex:index];
+		}
 	}
 	[plotsView setContent:urls];
 }
@@ -181,7 +189,7 @@
 		var i = [[[aNotification object] selectedRowIndexes] firstIndex];
 		if(i > -1){
 			var row = [[listDS objsToDisplay] objectAtIndex:i];
-			[webView setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:"Folder"]+"&file="+[row objectForKey:"Name"]];
+			[webView setMainFrameURL:@"php/tradeReport.php?group="+[row objectForKey:groupColHeaderName]+"&file="+[row objectForKey:"Name"]];
 		}
 	}
 }
@@ -227,7 +235,7 @@
 		var desc = [CPSortDescriptor sortDescriptorWithKey:headerKey ascending:NO];
 		var column = [[CPTableColumn alloc] initWithIdentifier:headerKey];
 		[[column headerView] setStringValue:headerKey];
-		[column setWidth:125.0];
+		[column setWidth:140.0];
 		[column setEditable:YES];
 		[column setSortDescriptorPrototype:desc];
 		[[column headerView] setBackgroundColor:headerColor];
@@ -236,13 +244,18 @@
 
     [scrollView setDocumentView:tableView]; 
 	[tableView reloadData]; 
+	[self createFilterBar];
 }
 - (void)createMenu
 {
     [CPMenu setMenuBarVisible:YES];
 	var theMenu = [[CPApplication sharedApplication] mainMenu];
-	var plotAllMenuItem = [[CPMenuItem alloc] initWithTitle:@"Plot All" action:@selector(openDetailsInNewWindow) keyEquivalent:nil];
+	
+	var plotAllMenuItem = [[CPMenuItem alloc] initWithTitle:plotAll action:@selector(openDetailsInNewWindow:) keyEquivalent:nil];
 	[theMenu insertItem:plotAllMenuItem atIndex: 0];
+	
+	var plotSelMenuItem = [[CPMenuItem alloc] initWithTitle:plotSel action:@selector(openDetailsInNewWindow:) keyEquivalent:nil];
+	[theMenu insertItem:plotSelMenuItem atIndex: 1]
 
 	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"New" ]];
 	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"Open"]];
@@ -310,7 +323,7 @@
 }
 - (void)createFilterBar
 {
-	filterBar = [[FilterBar alloc] initWithFrame:CGRectMake(0, 0, 400, 32)];
+	filterBar = [[FilterBar alloc] initWithFrame:CGRectMake(0, 0, 400, 32) colHeaders:[listDS columnHeaders]];
     [filterBar setAutoresizingMask:CPViewWidthSizable];
     [filterBar setDelegate:listDS];
 }

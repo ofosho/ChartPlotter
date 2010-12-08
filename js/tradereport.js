@@ -42,10 +42,6 @@ function addCommas(nStr){
 }
 $(document).ready(function(){
 //start report creation
-	//bind action to show historical data button
-	$('#showHist').bind('click',function(){
-			$('#hist').toggleClass('hide');
-	});
 	getHistoricalInfo();
 });
 function getHistoricalInfo(){
@@ -138,41 +134,51 @@ function plotAccordingToChoices(){
 	var choiceContainer = $("#choices");
 	choiceContainer.find("input:checked").each(function () {
 		var key = $(this).attr("name");
-		if (key && datasets[key])
+		datasets[key]["yaxis"] = 2;
+		if (key && datasets[key]["label"].match("olume") > -1)
 			data.push(datasets[key]);
 	});	
-	var options = { xaxis:{mode:"time",timeformat:"%b %d, %y"},
-					grid: {hoverable: true, autoHighlight: false, backgroundColor: '#FFFFFF'},
+	
+	var options = { xaxis: { ticks: [], mode: "time" },
+					//xaxis:{tickFormatter: function(v,axis){return "";}},
+					grid: {hoverable: true, autoHighlight: false, show:true},
 					crosshair: { mode: "x" },
 					selection:{mode: "x"},
-					legend:{container:$("#legend")}
+					//y2axis: {labelWidth:10,tickFormatter: function(v,axis){return v.toString().substring(0,4)}}
 				  };
-	plot = $.plot($("#placeholder"), data,options);
-    var overview = $.plot($("#overview"), data, {
+			
+	plot = $.plot($("#placeholder"), data ,options);
+	
+	var data2 = [];
+	data2.push(datasets[1]);
+    var overview = $.plot($("#overview"), data2, {
         series: {
             lines: { show: true, lineWidth: 1 },
             shadowSize: 0
         },
-		grid: {backgroundColor: 'white'},
-        xaxis: { ticks: [], mode: "time" },
-        yaxis: { ticks: [], min: 0, autoscaleMargin: 0.1 },
+		grid: {backgroundColor: '#FFFFFF'},
+		xaxis:{mode:"time",timeformat:"%b %d, %y"},
+		y2axis:{labelWidth:10,tickFormatter: function(v,axis){return v.toString().substring(0,4)}},
         selection: { mode: "x" },
 		legend: { show: false }
     });
-	legends = $("#legend .legendLabel");
+	
+	legends = $(".legendLabel");
 	
     $("#placeholder").bind("plotselected", function (event, ranges) {
        plot = $.plot($("#placeholder"), data,
                       $.extend(true, {}, options, {
                           xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to }
                       }));
-		legends = $("#legend .legendLabel");
+		legends = $(".legendLabel");
         // don't fire event on the overview to prevent eternal loop
         overview.setSelection(ranges, true);
     });
+	
     $("#overview").bind("plotselected", function (event, ranges) {
         plot.setSelection(ranges);
     });		
+	
     $("#placeholder").bind("plothover",  function (event, pos, item) {
 		latestPosition = pos;
         if (!updateLegendTimeout)

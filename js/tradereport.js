@@ -14,6 +14,7 @@ var legends = null;
 var updateLegendTimeout = null;
 var latestPosition = null;
 var plot = null;
+var overview = null;
 Array.prototype.getMax = function() {
 //get max number in array
 	var max = this[0][1];
@@ -47,6 +48,7 @@ $(document).ready(function(){
 function getHistoricalInfo(){
 //get historical info
 	dataName = $('#file').val();
+	$('#title').html(dataName);
 	groupName = $('#group').val();
 	$.ajax({
 		url: '../php/getCSVasTable.php',
@@ -69,7 +71,8 @@ function addDataSet(dataName,colName){
 //add data to the gobal datsets
 	data = [];
 	$('#'+dataName).find("tbody > tr").each(function(i,el){getValue(el,colName)});
-	var newset = {"label": dataName+'_'+colName, "data": data};
+	//var newset = {"label": dataName+'_'+colName, "data": data};
+	var newset = {"label": colName, "data": data};
 	datasets.push(newset);
 }
 function addData(dataName){
@@ -127,6 +130,26 @@ function updateLegend() {
 
 		legends.eq(i).text(addCommas(series.label +" = " + y));
 	}
+	var temp=i;
+	var i, j, dataset = overview.getData();
+	for (i = 0; i < dataset.length; ++i) {
+		var series = dataset[i];
+		// find the nearest points, x-wise
+		for (j = 0; j < series.data.length; ++j)
+			if (series.data[j][0] > pos.x)
+				break;
+
+		// now interpolate
+		var y, p1 = series.data[j - 1], p2 = series.data[j];
+		if (p1 == null)
+			y = p2[1];
+		else if (p2 == null)
+			y = p1[1];
+		else
+			y = parseFloat(p1[1]) + (p2[1] - p1[1]) * (pos.x - p1[0]) / (p2[0] - p1[0]);
+
+		legends.eq(i+temp).text(addCommas(series.label +" = " + y));
+	}
 }
 function plotAccordingToChoices(){
 //replot the chart based on user input
@@ -134,43 +157,47 @@ function plotAccordingToChoices(){
 	var choiceContainer = $("#choices");
 	choiceContainer.find("input:checked").each(function () {
 		var key = $(this).attr("name");
-		datasets[key]["yaxis"] = 2;
+		//datasets[key]["yaxis"] = 2;
 		if (key && datasets[key]["label"].match("olume") > -1)
 			data.push(datasets[key]);
 	});	
 	
 	var options = { xaxis: { ticks: [], mode: "time" },
-					//xaxis:{tickFormatter: function(v,axis){return "";}},
+					xaxis:{tickFormatter: function(v,axis){return "";}},
+					yaxis:{position:"right"},
 					grid: {hoverable: true, autoHighlight: false, show:true},
 					crosshair: { mode: "x" },
 					selection:{mode: "x"},
-					//y2axis: {labelWidth:10,tickFormatter: function(v,axis){return v.toString().substring(0,4)}}
+					legend:{backgroundColor:null,backgroundOpacity:0}
 				  };
 			
 	plot = $.plot($("#placeholder"), data ,options);
 	
 	var data2 = [];
 	data2.push(datasets[1]);
-    var overview = $.plot($("#overview"), data2, {
-        series: {
+    overview = $.plot($("#overview"), data2, {
+        series: {			
             lines: { show: true, lineWidth: 1 },
             shadowSize: 0
         },
 		grid: {backgroundColor: '#FFFFFF'},
 		xaxis:{mode:"time",timeformat:"%b %d, %y"},
-		y2axis:{labelWidth:10,tickFormatter: function(v,axis){return v.toString().substring(0,4)}},
+		yaxis:{position:"right",labelWidth:10,tickFormatter: function(v,axis){return v.toString().substring(0,2)}},
         selection: { mode: "x" },
-		legend: { show: false }
+		legend:{backgroundColor:null,backgroundOpacity:0},
+		bars: {show: true}
     });
 	
 	legends = $(".legendLabel");
-	
+	$("table").draggable();
+
     $("#placeholder").bind("plotselected", function (event, ranges) {
        plot = $.plot($("#placeholder"), data,
                       $.extend(true, {}, options, {
                           xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to }
                       }));
 		legends = $(".legendLabel");
+		$("table").draggable();
         // don't fire event on the overview to prevent eternal loop
         overview.setSelection(ranges, true);
     });

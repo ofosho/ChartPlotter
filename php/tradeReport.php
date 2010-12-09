@@ -5,6 +5,7 @@
 		<!--[if IE]><script language="javascript" type="text/javascript" src="/js/excanvas.js"></script><![endif]--> 
 		<script language="javascript" type="text/javascript" src="../js/dateformat.js"></script>		
 		<script language="javascript" type="text/javascript" src="../js/jquery.js"></script>
+		<script language="javascript" type="text/javascript" src="../js/jqueryui.js"></script>
 		<script language="javascript" type="text/javascript" src="../js/jquery.flot.js"></script>
 		<script language="javascript" type="text/javascript" src="../js/jquery.flot.selection.js"></script>	
 		<script language="javascript" type="text/javascript" src="../js/jquery.flot.crosshair.js"></script>		
@@ -17,8 +18,9 @@
 		<div id=main>
 			<div id=fullplot>
 				<div id=chart>
-				<div id="placeholder" style="width:550px;height:250px;"></div>
-				<div id="overview" style="width:550px;height:100px;"></div>
+				<div id=title style="font-family:Sans-serif;font-size:12px"></div>
+				<div id="placeholder" style="width:365px;height:215px;"></div>
+				<div id="overview" style="width:365px;height:100px;"></div>
 				</div>
 				<div id="side">
 					<div id="legend"></div>

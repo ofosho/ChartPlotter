@@ -10,12 +10,12 @@ reloadGroupsNoti = @"ReloadGroupsNotification";
 showFilterBarNoti = @"ShowFilterBarNotification";
 hideFilterBarNoti = @"HideFilterBarNotification";
 
-plotAll = @"Plot All";
-plotSel = @"Plot Selected";
+showAll = @"Plot All";
+showSel = @"Plot Selected";
 allName = @"All";
 
 minFilterBarGap = 15;
 minFilterBarY = 6;
 
-collViewWidth = 600;
+collViewWidth = 415; //this allows 3 columns @ 1280x1024
 collViewHeight = 400;

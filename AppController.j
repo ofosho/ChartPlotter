@@ -142,25 +142,25 @@
 	var contentView = [newWindow contentView],
 		bounds = [contentView bounds];
 	
-	var plotsView = [[CPCollectionView alloc] initWithFrame:bounds];       
-	[plotsView setAutoresizingMask:CPViewWidthSizable];
-	[plotsView setMinItemSize:CGSizeMake(collViewWidth, collViewHeight)];
-	[plotsView setMaxItemSize:CGSizeMake(collViewWidth, collViewHeight)];
+	var detsView = [[CPCollectionView alloc] initWithFrame:bounds];       
+	[detsView setAutoresizingMask:CPViewWidthSizable];
+	[detsView setMinItemSize:CGSizeMake(collViewWidth, collViewHeight)];
+	[detsView setMaxItemSize:CGSizeMake(collViewWidth, collViewHeight)];
 	
 	var itemPrototype = [[CPCollectionViewItem alloc] init],
-            plotView = [[DetailsWebView alloc] initWithFrame:CGRectMakeZero()];
+            detView = [[DetailsWebView alloc] initWithFrame:CGRectMakeZero()];
         
-    [itemPrototype setView:plotView];       
-    [plotsView setItemPrototype:itemPrototype];
+    [itemPrototype setView:detView];       
+    [detsView setItemPrototype:itemPrototype];
 	
 	var scrollViewDetails = [[CPScrollView alloc] initWithFrame:bounds];       
-	[scrollViewDetails setDocumentView:plotsView];
+	[scrollViewDetails setDocumentView:detsView];
 	[scrollViewDetails setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
 	[scrollViewDetails setAutohidesScrollers:YES];
 	[contentView addSubview:scrollViewDetails];
 
 	var urls = [];
-	if([sender title] == plotAll){
+	if([sender title] == showAll){
 		for(var i=0;i < [[listDS objsToDisplay] count];i++){
 			var row = [[listDS objsToDisplay] objectAtIndex:i];		
 			urls[i] = @"php/tradeReport.php?group="+[row objectForKey:groupColHeaderName]+"&file="+[row objectForKey:"Name"];
@@ -175,7 +175,7 @@
 			index = [indices indexGreaterThanIndex:index];
 		}
 	}
-	[plotsView setContent:urls];
+	[detsView setContent:urls];
 }
 - (void)tableViewSelectionDidChange:(CPNotification)aNotification
 {
@@ -251,11 +251,11 @@
     [CPMenu setMenuBarVisible:YES];
 	var theMenu = [[CPApplication sharedApplication] mainMenu];
 	
-	var plotAllMenuItem = [[CPMenuItem alloc] initWithTitle:plotAll action:@selector(openDetailsInNewWindow:) keyEquivalent:nil];
-	[theMenu insertItem:plotAllMenuItem atIndex: 0];
+	var showAllMenuItem = [[CPMenuItem alloc] initWithTitle:showAll action:@selector(openDetailsInNewWindow:) keyEquivalent:nil];
+	[theMenu insertItem:showAllMenuItem atIndex: 0];
 	
-	var plotSelMenuItem = [[CPMenuItem alloc] initWithTitle:plotSel action:@selector(openDetailsInNewWindow:) keyEquivalent:nil];
-	[theMenu insertItem:plotSelMenuItem atIndex: 1]
+	var showSelMenuItem = [[CPMenuItem alloc] initWithTitle:showSel action:@selector(openDetailsInNewWindow:) keyEquivalent:nil];
+	[theMenu insertItem:showSelMenuItem atIndex: 1]
 
 	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"New" ]];
 	[theMenu removeItemAtIndex:[theMenu indexOfItemWithTitle: @"Open"]];
